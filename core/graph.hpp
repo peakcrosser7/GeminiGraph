@@ -171,7 +171,7 @@ public:
       nodestring[s_i*2] = '0'+s_i;
     }
     struct bitmask * nodemask = numa_parse_nodestring(nodestring);
-    numa_set_interleave_mask(nodemask);
+    // numa_set_interleave_mask(nodemask);
 
     omp_set_dynamic(0);
     omp_set_num_threads(threads);
@@ -238,7 +238,7 @@ public:
 
   // deallocate a vertex array
   template<typename T>
-  T * dealloc_vertex_array(T * array) {
+  void dealloc_vertex_array(T * array) {
     numa_free(array, sizeof(T) * vertices);
   }
 

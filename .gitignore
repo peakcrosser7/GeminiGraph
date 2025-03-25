@@ -27,3 +27,12 @@
 *.exe
 *.out
 *.app
+
+bc
+bfs
+cc
+pagerank
+sssp
+.vscode/
+datasets/
+*.btr
