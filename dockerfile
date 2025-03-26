@@ -6,9 +6,7 @@ RUN apt-get update && \
     mpich \
     libnuma-dev \
     python3 \
-    gdb \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    gdb
 
 
 CMD ["/bin/bash"]
