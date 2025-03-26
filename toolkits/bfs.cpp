@@ -16,8 +16,14 @@ Copyright (c) 2014-2015 Xiaowei Zhu, Tsinghua University
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
+#include <iostream>
 
 #include "core/graph.hpp"
+
+using namespace std::chrono;
+
+#define NO_PRINT
 
 void compute(Graph<Empty> * graph, VertexId root) {
   double exec_time = 0;
@@ -39,7 +45,9 @@ void compute(Graph<Empty> * graph, VertexId root) {
 
   for (int i_i=0;active_vertices>0;i_i++) {
     if (graph->partition_id==0) {
+  #ifndef NO_PRINT
       printf("active(%d)>=%u\n", i_i, active_vertices);
+  #endif
     }
     active_out->clear();
     active_vertices = graph->process_edges<VertexId,VertexId>(
@@ -88,7 +96,9 @@ void compute(Graph<Empty> * graph, VertexId root) {
 
   exec_time += get_time();
   if (graph->partition_id==0) {
+#ifndef NO_PRINT
     printf("exec_time=%lf(s)\n", exec_time);
+#endif
   }
 
   graph->gather_vertex_array(parent, 0);
@@ -99,7 +109,9 @@ void compute(Graph<Empty> * graph, VertexId root) {
         found_vertices += 1;
       }
     }
+#ifndef NO_PRINT    
     printf("found_vertices = %u\n", found_vertices);
+#endif
   }
 
   graph->dealloc_vertex_array(parent);
@@ -121,10 +133,24 @@ int main(int argc, char ** argv) {
   VertexId root = std::atoi(argv[3]);
   graph->load_directed(argv[1], std::atoi(argv[2]));
 
+  auto n_edges = graph->edges;
+
   compute(graph, root);
-  for (int run=0;run<5;run++) {
+  auto t_start = high_resolution_clock::now();
+  int n_valid = 5;
+  for (int run=0;run<n_valid;run++) {
     compute(graph, root);
   }
+  auto t_stop = high_resolution_clock::now();
+  auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
+
+  float avg_time = (float)(elapsed) / 5;
+  std::cout << "Valid Runs : " << n_valid << "\n";
+  std::cout << "Source : " << root << "\n";
+  std::cout << "Average Elapsed Time : " << avg_time << " (ms)"
+            << std::endl;
+  std::cout << "GTEPS : " << (n_edges / 1e9) / (avg_time / 1000)
+            << std::endl;
 
   delete graph;
   return 0;
