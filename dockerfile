@@ -6,6 +6,7 @@ RUN apt-get update && \
     mpich \
     libnuma-dev \
     python3 \
+    git \
     gdb
 
 

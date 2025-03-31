@@ -5,8 +5,7 @@ container_name="hhy_develop_gemini"
 
 # YOU NEED TO SPECIFY!!!
 declare -a volumes=(
-    "/home/huanghaoyan.hhy/:/home/huanghaoyan.hhy/"
-    "/apsarapangu/:/apsarapangu/"
+    # 
 )
 
 volume_args=""

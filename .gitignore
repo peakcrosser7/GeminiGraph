@@ -33,6 +33,7 @@ bfs
 cc
 pagerank
 sssp
+tc
 .vscode/
 datasets/
 *.btr

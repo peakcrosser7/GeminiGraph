@@ -1,5 +1,5 @@
 ROOT_DIR= $(shell pwd)
-TARGETS= toolkits/bc toolkits/bfs toolkits/cc toolkits/pagerank toolkits/sssp
+TARGETS= toolkits/bc toolkits/bfs toolkits/cc toolkits/pagerank toolkits/sssp toolkits/tc
 MACROS= 
 # MACROS= -D PRINT_DEBUG_MESSAGES
 
