@@ -48,7 +48,7 @@ public:
     }
 };
 
-void compute(Graph<Empty> * graph) {
+void compute(Graph<Empty> * graph, EdgeId& total_triangles, EdgeId& visited_subgraphs) {
   VertexSubset * active = graph->alloc_vertex_subset();
   active->fill();
 
@@ -85,31 +85,8 @@ void compute(Graph<Empty> * graph) {
     active
   );
 
-  auto travel_adjlist = [](const VertexAdjList<Empty>& adjlist, VertexId dst) {
-    printf("dst: %d => ", dst);
-    for (AdjUnit<Empty>* ptr = adjlist.begin; ptr != adjlist.end; ptr++) {
-      VertexId src = ptr->neighbour;
-      printf("src: %d ", src);
-    }
-    printf("\n");
-  };
-
-  auto make_adj_vector = [](VertexAdjList<Empty> adjlist) -> std::vector<VertexId> {
-    auto cnt = adjlist.end - adjlist.begin;
-    std::vector<VertexId> adj_vector;
-    adj_vector.reserve(cnt);
-    for (AdjUnit<Empty>* ptr = adjlist.begin; ptr != adjlist.end; ptr++) {
-      VertexId src = ptr->neighbour;
-      adj_vector.push_back(src);
-    }
-    std::sort(adj_vector.begin(), adj_vector.end());
-    return adj_vector;
-  };
-
   auto find_triangles = [&](const std::vector<VertexId>* src_list, const std::vector<VertexId>* dst_list,
-                            VertexId src, VertexId dst) -> EdgeId {
-    // travel_adjlist(src_list, src);
-    // travel_adjlist(dst_list, dst);
+                            VertexId src, VertexId dst, EdgeId* visited_subgraphs) -> EdgeId {
 
     EdgeId src_len = src_list->size();
     EdgeId dst_len = dst_list->size();
@@ -121,18 +98,6 @@ void compute(Graph<Empty> * graph) {
       std::swap(src_list, dst_list);
     }
 
-    // EdgeId intersection_count = 0;
-    // for (AdjUnit<Empty>* src_ptr = src_list.begin; src_ptr != src_list.end; src_ptr++) {
-    //   VertexId a = src_ptr->neighbour;
-    //   for (AdjUnit<Empty>* dst_ptr = dst_list.begin; dst_ptr != dst_list.end; dst_ptr++) {
-    //     VertexId b = dst_ptr->neighbour;
-    //     if (a == b) {
-    //       ++intersection_count;
-    //       // printf("find a triangle: %d %d %d\n", src, dst, a);
-    //     }
-    //   }
-    // }
-
     VertexId needle = dst_list->front();
     auto src_search_start = std::lower_bound(src_list->begin(), src_list->end(), needle);
 
@@ -142,6 +107,9 @@ void compute(Graph<Empty> * graph) {
     auto dst_search_start = dst_list->begin();
     
     EdgeId intersection_count = 0;
+    EdgeId src_visited = src_search_start - src_list->begin();
+    EdgeId dst_visited = dst_search_start - dst_list->begin();
+
     while (src_search_start != src_list->end() &&
            dst_search_start != dst_list->end()) {
       auto cur_src = *src_search_start;
@@ -157,8 +125,15 @@ void compute(Graph<Empty> * graph) {
         ++dst_search_start;
       }
     }
+
+    src_visited = (src_search_start - src_list->begin()) - src_visited;
+    dst_visited = (dst_search_start - dst_list->begin()) - dst_visited;
+    write_add(visited_subgraphs, src_visited + dst_visited);
+
     return intersection_count;
   };
+
+  EdgeId vis_subgraphs = 0;
 
   EdgeId result = graph->process_edges<EdgeId, EdgeId>(
     [&](VertexId src){
@@ -169,19 +144,16 @@ void compute(Graph<Empty> * graph) {
       return 0;
     },
     [&](VertexId dst, VertexAdjList<Empty> incoming_adj) {
-      std::vector<VertexId>& dst_adj_vec = adjs[dst].get();
+      const std::vector<VertexId>& dst_adj_vec = adjs[dst].get();
       // std::vector<VertexId> dst_adj_vec = make_adj_vector(dst_adj);
       EdgeId traingle_cnt = 0;
       for (AdjUnit<Empty>* ptr = incoming_adj.begin; ptr != incoming_adj.end; ptr++) {
         VertexId src = ptr->neighbour;
         if (src >= dst) continue;
 
-        std::vector<VertexId>& src_adj_vec = adjs[src].get();
-        // std::vector<VertexId> src_adj_vec = make_adj_vector(src_adj);
-        traingle_cnt += find_triangles(&src_adj_vec, &dst_adj_vec, src, dst);
-        // printf("[dense send] dst: %d, src: %d, cnt: %ld\n", dst, src, traingle_cnt);
+        const std::vector<VertexId>& src_adj_vec = adjs[src].get();
+        traingle_cnt += find_triangles(&src_adj_vec, &dst_adj_vec, src, dst, &vis_subgraphs);
       }
-      // printf("%u,%lu\n", dst, traingle_cnt);
       graph->emit(dst, traingle_cnt);
     },
     [&](VertexId dst, EdgeId msg) {
@@ -190,17 +162,12 @@ void compute(Graph<Empty> * graph) {
     active
   );
   
-  printf("Triangle count: %lu\n", result);
-
-  // graph->process_vertices<int>(
-  //   [&](VertexId vtx) {
-  //     adjs[vtx].~vector();
-  //     return 0;
-  //   },
-  //   active
-  // );
+  // printf("Triangle count: %lu\n", result);
 
   delete active;
+
+  total_triangles = result;
+  visited_subgraphs = vis_subgraphs;
 }
 
 int main(int argc, char** argv) {
@@ -216,19 +183,25 @@ int main(int argc, char** argv) {
   graph->load_undirected_from_directed(argv[1], std::atoi(argv[2]));
 
   // compute(graph);
+  EdgeId total_triangles = 0;
+  EdgeId visited_subgraphs = 0;
   auto t_start = high_resolution_clock::now();
   int n_valid = 1;
   for (int run = 0; run < n_valid; run++) {
-    compute(graph);
+    compute(graph, total_triangles, visited_subgraphs);
   }
   auto t_stop = high_resolution_clock::now();
   auto elapsed = duration_cast<milliseconds>(t_stop - t_start).count();
 
   float avg_time = (float)(elapsed) / 1000 / n_valid;
   std::cout << "Valid Runs : " << n_valid << "\n";
+  std::cout << "Total Triangles : " << total_triangles << std::endl;
   std::cout << "Average Elapsed Time : " << avg_time << " (s)"
             << std::endl;
-
+  std::cout << "Visited Subgraphs: " << visited_subgraphs << "\n";
+  std::cout << "GTSPS : " << (visited_subgraphs / 1e9) / (avg_time)
+            << std::endl;
+  
   delete graph;
   return 0;
 }
