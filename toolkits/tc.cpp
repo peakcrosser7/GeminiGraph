@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
   MPI_Instance mpi(&argc, &argv);
 
   if (argc < 3) {
-    printf("tc [file] [vertices]\n");
+    printf("tc [file] [vertices] (n_runs)\n");
     exit(-1);
   }
 
@@ -186,20 +186,22 @@ int main(int argc, char** argv) {
   EdgeId total_triangles = 0;
   EdgeId visited_subgraphs = 0;
   auto t_start = high_resolution_clock::now();
-  int n_valid = 1;
+  int n_valid = argc >= 4 ? std::atoi(argv[3]) : 1;
+  assert(n_valid > 0);
+  
   for (int run = 0; run < n_valid; run++) {
     compute(graph, total_triangles, visited_subgraphs);
   }
   auto t_stop = high_resolution_clock::now();
-  auto elapsed = duration_cast<milliseconds>(t_stop - t_start).count();
+  auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
 
   float avg_time = (float)(elapsed) / 1000 / n_valid;
   std::cout << "Valid Runs : " << n_valid << "\n";
   std::cout << "Total Triangles : " << total_triangles << std::endl;
-  std::cout << "Average Elapsed Time : " << avg_time << " (s)"
+  std::cout << "Average Elapsed Time : " << avg_time << " (ms)"
             << std::endl;
   std::cout << "Visited Subgraphs: " << visited_subgraphs << "\n";
-  std::cout << "GTSPS : " << (visited_subgraphs / 1e9) / (avg_time)
+  std::cout << "GTSPS : " << (visited_subgraphs / 1e9) / (avg_time / 1000)
             << std::endl;
   
   delete graph;
