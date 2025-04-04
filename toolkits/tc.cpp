@@ -52,7 +52,7 @@ void compute(Graph<Empty> * graph, EdgeId& total_triangles, EdgeId& visited_subg
   VertexSubset * active = graph->alloc_vertex_subset();
   active->fill();
 
-  std::vector<SafeVector<VertexId>> adjs(graph->vertices);
+  std::vector<SafeVector<VertexAdjList<Empty>>> adjlists(graph->vertices);
 
   graph->process_edges<VertexId,VertexAdjList<Empty>>(
     [&](VertexId src){
@@ -66,24 +66,23 @@ void compute(Graph<Empty> * graph, EdgeId& total_triangles, EdgeId& visited_subg
       graph->emit(dst, incoming_adj);
     },
     [&](VertexId dst, VertexAdjList<Empty> msg) {
-      // printf("%u,%p,%p\n", dst, msg.begin, msg.end);
-      // adjs[dst] = std::vector<VertexId>{};
-      for (AdjUnit<Empty>* ptr = msg.begin; ptr != msg.end; ptr++) {
-        VertexId src = ptr->neighbour;
-        adjs[dst].push_back(src);
-      }
+      adjlists[dst].push_back(msg);
       return 0;
     },
     active
   );
 
-  graph->process_vertices<int>(
-    [&](VertexId vtx) {
-      std::sort(adjs[vtx].get().begin(), adjs[vtx].get().end());
-      return 0;
-    },
-    active
-  );
+  auto make_adj_vector = [&](const SafeVector<VertexAdjList<Empty>>& adjlist) {
+    std::vector<VertexId> adj_vec;
+    for (const VertexAdjList<Empty>& adj: adjlist.get()) {
+      for (AdjUnit<Empty>* ptr = adj.begin; ptr != adj.end; ptr++) {
+        VertexId src = ptr->neighbour;
+        adj_vec.push_back(src);
+      }
+    }
+    std::sort(adj_vec.begin(), adj_vec.end());
+    return adj_vec;
+  };
 
   auto find_triangles = [&](const std::vector<VertexId>* src_list, const std::vector<VertexId>* dst_list,
                             VertexId src, VertexId dst, EdgeId* visited_subgraphs) -> EdgeId {
@@ -144,14 +143,12 @@ void compute(Graph<Empty> * graph, EdgeId& total_triangles, EdgeId& visited_subg
       return 0;
     },
     [&](VertexId dst, VertexAdjList<Empty> incoming_adj) {
-      const std::vector<VertexId>& dst_adj_vec = adjs[dst].get();
-      // std::vector<VertexId> dst_adj_vec = make_adj_vector(dst_adj);
       EdgeId traingle_cnt = 0;
       for (AdjUnit<Empty>* ptr = incoming_adj.begin; ptr != incoming_adj.end; ptr++) {
         VertexId src = ptr->neighbour;
         if (src >= dst) continue;
-
-        const std::vector<VertexId>& src_adj_vec = adjs[src].get();
+        std::vector<VertexId> dst_adj_vec = make_adj_vector(adjlists[dst]);
+        std::vector<VertexId> src_adj_vec = make_adj_vector(adjlists[src]);
         traingle_cnt += find_triangles(&src_adj_vec, &dst_adj_vec, src, dst, &vis_subgraphs);
       }
       graph->emit(dst, traingle_cnt);
@@ -166,8 +163,8 @@ void compute(Graph<Empty> * graph, EdgeId& total_triangles, EdgeId& visited_subg
 
   delete active;
 
-  total_triangles = result;
-  visited_subgraphs = vis_subgraphs;
+  total_triangles = result / 3;
+  visited_subgraphs = vis_subgraphs / 3;
 }
 
 int main(int argc, char** argv) {
@@ -178,6 +175,7 @@ int main(int argc, char** argv) {
     exit(-1);
   }
 
+  auto t_start = high_resolution_clock::now();
   Graph<Empty> * graph;
   graph = new Graph<Empty>();
   graph->load_undirected_from_directed(argv[1], std::atoi(argv[2]));
@@ -185,7 +183,6 @@ int main(int argc, char** argv) {
   // compute(graph);
   EdgeId total_triangles = 0;
   EdgeId visited_subgraphs = 0;
-  auto t_start = high_resolution_clock::now();
   int n_valid = argc >= 4 ? std::atoi(argv[3]) : 1;
   assert(n_valid > 0);
   
@@ -196,7 +193,7 @@ int main(int argc, char** argv) {
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
 
   float avg_time = (float)(elapsed) / 1000 / n_valid;
-  std::cout << "Valid Runs : " << n_valid << "\n";
+  // std::cout << "Valid Runs : " << n_valid << "\n";
   std::cout << "Total Triangles : " << total_triangles << std::endl;
   std::cout << "Average Elapsed Time : " << avg_time << " (ms)"
             << std::endl;

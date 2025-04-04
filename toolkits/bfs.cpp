@@ -145,7 +145,6 @@ int main(int argc, char ** argv) {
   auto elapsed = duration_cast<microseconds>(t_stop - t_start).count();
 
   float avg_time = (float)(elapsed) / 1000 / n_valid;
-  std::cout << "Valid Runs : " << n_valid << "\n";
   std::cout << "Source : " << root << "\n";
   std::cout << "Average Elapsed Time : " << avg_time << " (ms)"
             << std::endl;
